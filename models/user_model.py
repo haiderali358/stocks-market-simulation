@@ -1,5 +1,4 @@
 from sqlalchemy import Column, String, Float
-
 from models.base_model import BaseModel
 
 

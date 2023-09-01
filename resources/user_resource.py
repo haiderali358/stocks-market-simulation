@@ -8,10 +8,11 @@ from database.database import db
 from models.user_model import User
 from flask import jsonify
 from flask_jwt_extended import jwt_required
+from schemas.user_schema import UserSignUpSchema, UserSignInSchema, UserDataViewSchema
+from flask_pydantic import validate
 
 
 redis_conn = redis.StrictRedis(host='localhost', port=6379, db=0)
-
 
 
 def hash_password(password):
@@ -22,46 +23,36 @@ def verify_password(password, hashed_password):
     return sha256.verify(password, hashed_password)
 
 
-plain_password = "mysecretpassword"
-hashed_password = hash_password(plain_password)
-
-if verify_password(plain_password, hashed_password):
-    print("Password is correct")
-else:
-    print("Password is incorrect")
-
-
 class UserSignUp(Resource):
-    def post(self):
-        parser = reqparse.RequestParser()
-        parser.add_argument("username", type=str, required=True)
-        parser.add_argument("password", type=str, required=True)
-        parser.add_argument("balance", type=float, required=True)
-        data = parser.parse_args()
-        hashed_password = hash_password(data['password'])
-        user = User(username=data['username'], password=hashed_password, balance=data['balance'])
+    @validate()
+    def post(self, body: UserSignUpSchema):
+        username = body.username
+        password = body.password
+        balance = body.balance
+        hashed_password = hash_password(password)
+        user = User(username=username, password=hashed_password, balance=balance)
         db.add(user)
         db.commit()
         return {"message": USER_REGISTERED}
 
+
 class UserSignIn(Resource):
-    def post(self):
-        parser = reqparse.RequestParser()
-        parser.add_argument("username", type=str, required=True)
-        parser.add_argument("password", type=str, required=True)
-        data = parser.parse_args()
-        user = db.query(User).filter(User.username == data['username']).first()
-        if user and verify_password(data['password'], user.password):
-            access_token = create_access_token(identity=data['username'])
-            refresh_token = create_refresh_token(identity=data['username'])
+    @validate()
+    def post(self, body: UserSignInSchema):
+        username = body.username
+        password = body.password
+        balance = body.balance
+        user = db.query(User).filter(User.username == username).first()
+        if user and verify_password(password, user.password):
+            access_token = create_access_token(identity=username)
+            refresh_token = create_refresh_token(identity=username)
             return jsonify({'access_token': access_token, 'refresh_token': refresh_token})
-        else:
-            return jsonify({'message': USER_SIGN_IN_FAILED}), 401
+        return jsonify({'message': USER_SIGN_IN_FAILED}), 401
 
 
 class UserData(Resource):
     @jwt_required()
-    def get(self, username=None):
+    def get(self, username):
         cached_data = redis_conn.get(username)
         if cached_data:
             return jsonify(json.loads(cached_data))

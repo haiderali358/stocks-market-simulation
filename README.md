@@ -1,5 +1,5 @@
-# Stock Marketing Stimulation Project:
-## Create virtual Enviroment
+# Stock Marketing Stimulation:
+## Create virtual Environment
 <pre>
 python3 -m venv env 
 </pre>
